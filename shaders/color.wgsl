@@ -43,16 +43,13 @@ fn vs_main(
 
 // Fragment shader
 
-struct MaterialProperties {
-    ambient: vec3<f32>,
-    diffuse: vec3<f32>,
-    specular: vec3<f32>,
-    shininess: f32,
+struct ColorMaterial {
+    color: vec4<f32>,
 };
 @group(0) @binding(0)
-var<uniform> properties: MaterialProperties;
+var<uniform> material: ColorMaterial;
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-  return vec4<f32>(properties.diffuse, 1.0); 
+  return material.color; 
 }
