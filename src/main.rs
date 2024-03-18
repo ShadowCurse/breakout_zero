@@ -248,6 +248,43 @@ impl Game {
             [0.0, -1.0, 0.0],
         );
 
+        let mut pos = Vector3::new(0.0, 1.5, 0.0);
+        let rows: u32 = 3;
+        let cols: u32 = 4;
+        let width: f32 = 1.5;
+        let height: f32 = 0.8;
+        let gap_x: f32 = 0.2;
+        let gap_y: f32 = 0.2;
+        if rows % 2 == 0 {
+            pos.y += (gap_y / 2.0 + height / 2.0) - (gap_y + height) * ((rows - 1) / 2) as f32;
+        } else {
+            pos.y += (gap_y + height) * ((rows - 1) / 2) as f32;
+        }
+        if cols % 2 == 0 {
+            pos.x -= (gap_x / 2.0 + width / 2.0) + (gap_x + width) * ((cols - 1) / 2) as f32;
+        } else {
+            pos.x -= (gap_x + width) * ((cols - 1) / 2) as f32;
+        }
+
+        let mut crates = vec![];
+        for x in 0..cols {
+            for y in 0..rows {
+                let c = GameObject::new(
+                    &renderer,
+                    &mut storage,
+                    width,
+                    height,
+                    [0.8, 0.8, 0.8, 1.0],
+                    [
+                        0.0,
+                        pos.y + y as f32 * (height + gap_y),
+                        pos.x + x as f32 * (width + gap_x),
+                    ],
+                );
+                crates.push(c);
+            }
+        }
+
         Self {
             renderer,
             storage,
@@ -257,7 +294,7 @@ impl Game {
             camera,
             ball,
             platform,
-            crates: vec![],
+            crates,
             platform_movement: 0.0,
         }
     }
@@ -332,9 +369,17 @@ impl Game {
         let platform_command = self
             .platform
             .command(self.color_pipeline_id, self.camera.bind_group.0);
+        let crates_commands = self
+            .crates
+            .iter()
+            .map(|c| c.command(self.color_pipeline_id, self.camera.bind_group.0))
+            .collect::<Vec<_>>();
         {
             let mut render_pass = self.phase.render_pass(&mut encoder, &current_frame_storage);
-            for command in [ball_command, platform_command] {
+            for command in [ball_command, platform_command]
+                .iter()
+                .chain(crates_commands.iter())
+            {
                 command.execute(&mut render_pass, &current_frame_storage);
             }
         }
