@@ -248,26 +248,21 @@ impl Game {
             [0.0, -1.0, 0.0],
         );
 
-        let mut pos = Vector3::new(0.0, 1.5, 0.0);
+        let center = Vector3::new(0.0, 3.0, 0.0);
         let rows: u32 = 3;
         let cols: u32 = 4;
         let width: f32 = 1.5;
         let height: f32 = 0.8;
-        let gap_x: f32 = 0.2;
+        let gap_z: f32 = 0.2;
         let gap_y: f32 = 0.2;
-        if rows % 2 == 0 {
-            pos.y += (gap_y / 2.0 + height / 2.0) - (gap_y + height) * ((rows - 1) / 2) as f32;
-        } else {
-            pos.y += (gap_y + height) * ((rows - 1) / 2) as f32;
-        }
-        if cols % 2 == 0 {
-            pos.x -= (gap_x / 2.0 + width / 2.0) + (gap_x + width) * ((cols - 1) / 2) as f32;
-        } else {
-            pos.x -= (gap_x + width) * ((cols - 1) / 2) as f32;
-        }
-
+        let bottom_left = center
+            - Vector3::new(
+                0.0,
+                (gap_y + height) / 2.0 * (rows - 1) as f32,
+                (gap_z + width) / 2.0 * (cols - 1) as f32,
+            );
         let mut crates = vec![];
-        for x in 0..cols {
+        for z in 0..cols {
             for y in 0..rows {
                 let c = GameObject::new(
                     &renderer,
@@ -277,8 +272,8 @@ impl Game {
                     [0.8, 0.8, 0.8, 1.0],
                     [
                         0.0,
-                        pos.y + y as f32 * (height + gap_y),
-                        pos.x + x as f32 * (width + gap_x),
+                        bottom_left.y + y as f32 * (height + gap_y),
+                        bottom_left.z + z as f32 * (width + gap_z),
                     ],
                 );
                 crates.push(c);
