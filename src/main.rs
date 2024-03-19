@@ -44,16 +44,16 @@ struct GameCamera {
 
 impl GameCamera {
     pub fn new(renderer: &Renderer, storage: &mut RenderStorage, position: [f32; 3]) -> Self {
-        let camera = Camera::new(
-            position,
-            Deg(0.0),
-            Deg(0.0),
-            renderer.size().width,
-            renderer.size().height,
-            Deg(90.0),
-            0.1,
-            100.0,
-        );
+        let camera = Camera::Orthogonal(OrthogonalCamera {
+            position: position.into(),
+            direction: -Vector3::unit_z(),
+            left: -10.0,
+            right: 10.0,
+            bottom: -10.0,
+            top: 10.0,
+            near: 0.1,
+            far: 100.0,
+        });
         let handle = CameraHandle::new(storage, camera.build(renderer));
         let bind_group = CameraBindGroup::new(renderer, storage, &handle);
 
@@ -62,10 +62,6 @@ impl GameCamera {
             handle,
             bind_group,
         }
-    }
-
-    pub fn resize(&mut self, physcal_size: PhysicalSize<u32>) {
-        self.camera.resize(physcal_size.width, physcal_size.height);
     }
 }
 
@@ -100,9 +96,6 @@ impl GameObject {
 
         let transform = Transform {
             translation: position.into(),
-            // quads are in x/y plane
-            // camera looks at z/y plane
-            rotation: Quaternion::from_angle_y(Deg(-90.0)),
             ..Default::default()
         };
         let transform_handle = TransformHandle::new(storage, transform.build(renderer));
@@ -229,7 +222,7 @@ impl Game {
             }),
         );
 
-        let camera = GameCamera::new(&renderer, &mut storage, [-15.0, 2.0, 0.0]);
+        let camera = GameCamera::new(&renderer, &mut storage, [0.0, 0.0, 5.0]);
 
         let ball = GameObject::new(
             &renderer,
@@ -253,16 +246,16 @@ impl Game {
         let cols: u32 = 4;
         let width: f32 = 1.5;
         let height: f32 = 0.8;
-        let gap_z: f32 = 0.2;
+        let gap_x: f32 = 0.2;
         let gap_y: f32 = 0.2;
         let bottom_left = center
             - Vector3::new(
-                0.0,
+                (gap_x + width) / 2.0 * (cols - 1) as f32,
                 (gap_y + height) / 2.0 * (rows - 1) as f32,
-                (gap_z + width) / 2.0 * (cols - 1) as f32,
+                0.0,
             );
         let mut crates = vec![];
-        for z in 0..cols {
+        for x in 0..cols {
             for y in 0..rows {
                 let c = GameObject::new(
                     &renderer,
@@ -271,9 +264,9 @@ impl Game {
                     height,
                     [0.8, 0.8, 0.8, 1.0],
                     [
-                        0.0,
+                        bottom_left.x + x as f32 * (width + gap_x),
                         bottom_left.y + y as f32 * (height + gap_y),
-                        bottom_left.z + z as f32 * (width + gap_z),
+                        0.0,
                     ],
                 );
                 crates.push(c);
@@ -314,7 +307,6 @@ impl Game {
     }
 
     pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
-        self.camera.resize(physical_size);
         self.renderer.resize(Some(physical_size));
         self.storage.replace_texture(
             self.depth_texture_id,
@@ -324,7 +316,7 @@ impl Game {
 
     pub fn update(&mut self, dt: f32) {
         self.platform.transform.translation +=
-            Vector3::new(0.0, 0.0, self.platform_movement * 10.0 * dt);
+            Vector3::new(self.platform_movement * 10.0 * dt, 0.0, 0.0);
     }
 
     pub fn render_sync(&mut self) {
