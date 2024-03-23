@@ -4,7 +4,12 @@ use winit::{
     window::WindowBuilder,
 };
 
+mod ball;
+mod border;
+mod crates;
 mod game;
+mod physics;
+mod platform;
 
 use game::*;
 

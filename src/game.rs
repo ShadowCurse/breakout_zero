@@ -2,6 +2,10 @@ use wgpu::StoreOp;
 use winit::{dpi::PhysicalSize, event::ElementState, keyboard::Key, window::Window};
 use zero::{const_vec, impl_simple_buffer, prelude::*};
 
+use crate::{
+    ball::Ball, border::Border, crates::CratePack, physics::Rectangle, platform::Platform,
+};
+
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ColorMaterialUniform {
@@ -60,16 +64,16 @@ impl GameCamera {
 }
 
 pub struct GameObject {
-    mesh: Mesh,
-    mesh_id: ResourceId,
+    pub quad: Quad,
+    pub mesh_id: ResourceId,
 
-    material: ColorMaterial,
-    material_handle: ColorMaterialHandle,
-    material_bind_group: ColorMaterialBindGroup,
+    pub material: ColorMaterial,
+    pub material_handle: ColorMaterialHandle,
+    pub material_bind_group: ColorMaterialBindGroup,
 
-    transform: Transform,
-    transform_handle: TransformHandle,
-    transform_bind_group: TransformBindGroup,
+    pub transform: Transform,
+    pub transform_handle: TransformHandle,
+    pub transform_bind_group: TransformBindGroup,
 }
 
 impl GameObject {
@@ -79,9 +83,10 @@ impl GameObject {
         width: f32,
         height: f32,
         color: [f32; 4],
-        position: [f32; 3],
+        position: Vector3<f32>,
     ) -> Self {
-        let mesh: Mesh = Quad::new(width, height).into();
+        let quad = Quad::new(width, height);
+        let mesh: Mesh = quad.into();
         let mesh_id = storage.insert_mesh(mesh.build(renderer));
 
         let material = ColorMaterial { color };
@@ -89,14 +94,14 @@ impl GameObject {
         let material_bind_group = ColorMaterialBindGroup::new(renderer, storage, &material_handle);
 
         let transform = Transform {
-            translation: position.into(),
+            translation: position,
             ..Default::default()
         };
         let transform_handle = TransformHandle::new(storage, transform.build(renderer));
         let transform_bind_group = TransformBindGroup::new(renderer, storage, &transform_handle);
 
         Self {
-            mesh,
+            quad,
             mesh_id,
             material,
             material_handle,
@@ -125,6 +130,19 @@ impl GameObject {
             ],
         }
     }
+
+    pub fn rect(&self) -> Rectangle {
+        Rectangle::from_center(
+            self.transform.translation.truncate(),
+            self.quad.width,
+            self.quad.height,
+        )
+    }
+
+    pub fn update_transform(&self, renderer: &Renderer, storage: &RenderStorage) {
+        self.transform_handle
+            .update(renderer, storage, &self.transform);
+    }
 }
 
 pub struct Game {
@@ -138,11 +156,10 @@ pub struct Game {
 
     camera: GameCamera,
 
-    ball: GameObject,
-    platform: GameObject,
-    crates: Vec<GameObject>,
-
-    platform_movement: f32,
+    border: Border,
+    ball: Ball,
+    platform: Platform,
+    crate_pack: CratePack,
 }
 
 impl Game {
@@ -218,54 +235,110 @@ impl Game {
 
         let camera = GameCamera::new(&renderer, &mut storage, [0.0, 0.0, 5.0]);
 
-        let ball = GameObject::new(
+        // let ball = GameObject::new(
+        //     &renderer,
+        //     &mut storage,
+        //     1.0,
+        //     1.0,
+        //     [0.4, 0.9, 0.4, 1.0],
+        //     [0.0, 0.0, 0.0],
+        // );
+        // let platform = GameObject::new(
+        //     &renderer,
+        //     &mut storage,
+        //     2.0,
+        //     0.5,
+        //     [0.6, 0.6, 0.6, 1.0],
+        //     [0.0, -1.0, 0.0],
+        // );
+        //
+        // let center = Vector3::new(0.0, 3.0, 0.0);
+        // let rows: u32 = 3;
+        // let cols: u32 = 4;
+        // let width: f32 = 1.5;
+        // let height: f32 = 0.8;
+        // let gap_x: f32 = 0.2;
+        // let gap_y: f32 = 0.2;
+        // let bottom_left = center
+        //     - Vector3::new(
+        //         (gap_x + width) / 2.0 * (cols - 1) as f32,
+        //         (gap_y + height) / 2.0 * (rows - 1) as f32,
+        //         0.0,
+        //     );
+        // let mut crates = vec![];
+        // for x in 0..cols {
+        //     for y in 0..rows {
+        //         let c = GameObject::new(
+        //             &renderer,
+        //             &mut storage,
+        //             width,
+        //             height,
+        //             [0.8, 0.8, 0.8, 1.0],
+        //             [
+        //                 bottom_left.x + x as f32 * (width + gap_x),
+        //                 bottom_left.y + y as f32 * (height + gap_y),
+        //                 0.0,
+        //             ],
+        //         );
+        //         crates.push(c);
+        //     }
+        // }
+        //
+        let border = Border::new(
             &renderer,
             &mut storage,
-            1.0,
-            1.0,
-            [0.4, 0.9, 0.4, 1.0],
-            [0.0, 0.0, 0.0],
+            15.0,
+            20.0,
+            0.2,
+            [0.6, 0.6, 0.6, 1.0],
+            [0.0, 0.0, 0.0, 0.0],
         );
-        let platform = GameObject::new(
+
+        let platform = Platform::new(
             &renderer,
             &mut storage,
+            Vector3 {
+                x: 0.0,
+                y: -1.0,
+                z: 0.0,
+            },
             2.0,
             0.5,
             [0.6, 0.6, 0.6, 1.0],
-            [0.0, -1.0, 0.0],
+            5.0,
         );
 
-        let center = Vector3::new(0.0, 3.0, 0.0);
-        let rows: u32 = 3;
-        let cols: u32 = 4;
-        let width: f32 = 1.5;
-        let height: f32 = 0.8;
-        let gap_x: f32 = 0.2;
-        let gap_y: f32 = 0.2;
-        let bottom_left = center
-            - Vector3::new(
-                (gap_x + width) / 2.0 * (cols - 1) as f32,
-                (gap_y + height) / 2.0 * (rows - 1) as f32,
-                0.0,
-            );
-        let mut crates = vec![];
-        for x in 0..cols {
-            for y in 0..rows {
-                let c = GameObject::new(
-                    &renderer,
-                    &mut storage,
-                    width,
-                    height,
-                    [0.8, 0.8, 0.8, 1.0],
-                    [
-                        bottom_left.x + x as f32 * (width + gap_x),
-                        bottom_left.y + y as f32 * (height + gap_y),
-                        0.0,
-                    ],
-                );
-                crates.push(c);
-            }
-        }
+        let ball = Ball::new(
+            &renderer,
+            &mut storage,
+            Vector3 {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            1.0,
+            1.0,
+            [0.4, 0.9, 0.4, 1.0],
+            Vector2 { x: 2.5, y: 2.5 },
+            1.0,
+        );
+
+        let crate_pack = CratePack::new(
+            &renderer,
+            &mut storage,
+            Vector3 {
+                x: 0.0,
+                y: 4.0,
+                z: 0.0,
+            },
+            3,
+            4,
+            1.5,
+            1.0,
+            0.2,
+            0.2,
+            [0.4, 0.4, 0.4, 1.0],
+        );
 
         Self {
             renderer,
@@ -274,30 +347,15 @@ impl Game {
             depth_texture_id,
             phase,
             camera,
+            border,
             ball,
             platform,
-            crates,
-            platform_movement: 0.0,
+            crate_pack,
         }
     }
 
     pub fn handle_input(&mut self, key: &Key, state: &ElementState) {
-        let pressed = if *state == ElementState::Pressed {
-            1.0
-        } else {
-            0.0
-        };
-        if let Key::Character(c) = key {
-            match c.as_str() {
-                "a" | "A" => {
-                    self.platform_movement = -pressed;
-                }
-                "d" | "D" => {
-                    self.platform_movement = pressed;
-                }
-                _ => {}
-            }
-        }
+        self.platform.handle_input(key, state);
     }
 
     pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
@@ -309,16 +367,14 @@ impl Game {
     }
 
     pub fn update(&mut self, dt: f32) {
-        self.platform.transform.translation +=
-            Vector3::new(self.platform_movement * 10.0 * dt, 0.0, 0.0);
+        self.platform.update(&self.border, dt);
+        self.ball
+            .update(&self.border, &self.platform, &mut self.crate_pack, dt);
     }
 
     pub fn render_sync(&mut self) {
-        self.platform.transform_handle.update(
-            &self.renderer,
-            &self.storage,
-            &self.platform.transform,
-        );
+        self.platform.render_sync(&self.renderer, &self.storage);
+        self.ball.render_sync(&self.renderer, &self.storage);
     }
 
     pub fn render(&mut self) -> bool {
@@ -344,21 +400,23 @@ impl Game {
 
         let mut encoder = self.renderer.create_encoder();
 
+        let border_commands = self
+            .border
+            .render_commands(self.color_pipeline_id, self.camera.bind_group.0);
         let ball_command = self
             .ball
-            .command(self.color_pipeline_id, self.camera.bind_group.0);
+            .render_command(self.color_pipeline_id, self.camera.bind_group.0);
         let platform_command = self
             .platform
-            .command(self.color_pipeline_id, self.camera.bind_group.0);
+            .render_command(self.color_pipeline_id, self.camera.bind_group.0);
         let crates_commands = self
-            .crates
-            .iter()
-            .map(|c| c.command(self.color_pipeline_id, self.camera.bind_group.0))
-            .collect::<Vec<_>>();
+            .crate_pack
+            .render_commands(self.color_pipeline_id, self.camera.bind_group.0);
         {
             let mut render_pass = self.phase.render_pass(&mut encoder, &current_frame_storage);
-            for command in [ball_command, platform_command]
+            for command in border_commands
                 .iter()
+                .chain([ball_command, platform_command].iter())
                 .chain(crates_commands.iter())
             {
                 command.execute(&mut render_pass, &current_frame_storage);
