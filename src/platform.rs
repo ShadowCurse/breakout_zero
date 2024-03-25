@@ -5,7 +5,7 @@ use zero::{
     render::{
         renderer::Renderer,
         storage::{RenderStorage, ResourceId},
-    },
+    }, shapes::Quad,
 };
 
 use crate::{
@@ -32,7 +32,15 @@ impl Platform {
         speed: f32,
     ) -> Self {
         Self {
-            game_object: GameObject::new(renderer, storage, width, height, color, position),
+            game_object: GameObject::new(
+                renderer,
+                storage,
+                Quad::new(width, height),
+                width,
+                height,
+                color,
+                position,
+            ),
             speed,
             movement: 0.0,
         }
@@ -63,10 +71,10 @@ impl Platform {
         if let Some(collision) = border.collides(self) {
             if 0.0 <= collision.normal.x {
                 self.game_object.transform.translation.x =
-                    collision.pos.x + self.game_object.quad.width / 2.0;
+                    collision.pos.x + self.game_object.rect_width / 2.0;
             } else {
                 self.game_object.transform.translation.x =
-                    collision.pos.x - self.game_object.quad.width / 2.0;
+                    collision.pos.x - self.game_object.rect_width / 2.0;
             }
         }
     }

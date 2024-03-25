@@ -5,6 +5,7 @@ use zero::{
         renderer::Renderer,
         storage::{RenderStorage, ResourceId},
     },
+    shapes::Circle,
 };
 
 use crate::{
@@ -26,14 +27,21 @@ impl Ball {
         renderer: &Renderer,
         storage: &mut RenderStorage,
         position: Vector3<f32>,
-        width: f32,
-        height: f32,
+        radius: f32,
         color: [f32; 4],
         velocity: Vector2<f32>,
         speed: f32,
     ) -> Self {
         Self {
-            game_object: GameObject::new(renderer, storage, width, height, color, position),
+            game_object: GameObject::new(
+                renderer,
+                storage,
+                Circle::new(radius, 50),
+                radius * 2.0,
+                radius * 2.0,
+                color,
+                position,
+            ),
             velocity,
             speed,
         }

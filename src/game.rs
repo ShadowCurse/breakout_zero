@@ -64,7 +64,6 @@ impl GameCamera {
 }
 
 pub struct GameObject {
-    pub quad: Quad,
     pub mesh_id: ResourceId,
 
     pub material: ColorMaterial,
@@ -74,19 +73,22 @@ pub struct GameObject {
     pub transform: Transform,
     pub transform_handle: TransformHandle,
     pub transform_bind_group: TransformBindGroup,
+
+    pub rect_width: f32,
+    pub rect_height: f32,
 }
 
 impl GameObject {
-    pub fn new(
+    pub fn new<M: Into<Mesh>>(
         renderer: &Renderer,
         storage: &mut RenderStorage,
-        width: f32,
-        height: f32,
+        mesh: M,
+        rect_width: f32,
+        rect_height: f32,
         color: [f32; 4],
         position: Vector3<f32>,
     ) -> Self {
-        let quad = Quad::new(width, height);
-        let mesh: Mesh = quad.into();
+        let mesh: Mesh = mesh.into();
         let mesh_id = storage.insert_mesh(mesh.build(renderer));
 
         let material = ColorMaterial { color };
@@ -101,7 +103,6 @@ impl GameObject {
         let transform_bind_group = TransformBindGroup::new(renderer, storage, &transform_handle);
 
         Self {
-            quad,
             mesh_id,
             material,
             material_handle,
@@ -109,6 +110,8 @@ impl GameObject {
             transform,
             transform_handle,
             transform_bind_group,
+            rect_width,
+            rect_height,
         }
     }
 
@@ -134,8 +137,8 @@ impl GameObject {
     pub fn rect(&self) -> Rectangle {
         Rectangle::from_center(
             self.transform.translation.truncate(),
-            self.quad.width,
-            self.quad.height,
+            self.rect_width,
+            self.rect_height,
         )
     }
 
@@ -250,7 +253,7 @@ impl Game {
             &mut storage,
             Vector3 {
                 x: 0.0,
-                y: -1.0,
+                y: -8.0,
                 z: 0.0,
             },
             2.0,
@@ -264,11 +267,10 @@ impl Game {
             &mut storage,
             Vector3 {
                 x: 0.0,
-                y: 1.0,
+                y: -7.0,
                 z: 0.0,
             },
-            1.0,
-            1.0,
+            0.5,
             [0.0, 0.9, 0.18, 1.0],
             Vector2 { x: 2.5, y: 2.5 },
             1.0,
@@ -282,8 +284,8 @@ impl Game {
                 y: 4.0,
                 z: 0.0,
             },
-            3,
-            4,
+            5,
+            7,
             1.5,
             1.0,
             0.2,

@@ -5,6 +5,7 @@ use zero::{
         renderer::Renderer,
         storage::{RenderStorage, ResourceId},
     },
+    shapes::Quad,
 };
 
 use crate::{
@@ -27,7 +28,15 @@ impl Crate {
         color: [f32; 4],
     ) -> Self {
         Self {
-            game_object: GameObject::new(renderer, storage, width, height, color, position),
+            game_object: GameObject::new(
+                renderer,
+                storage,
+                Quad::new(width, height),
+                width,
+                height,
+                color,
+                position,
+            ),
             disabled: false,
         }
     }

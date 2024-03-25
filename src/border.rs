@@ -5,6 +5,7 @@ use zero::{
         renderer::Renderer,
         storage::{RenderStorage, ResourceId},
     },
+    shapes::Quad,
 };
 
 use crate::{
@@ -31,6 +32,7 @@ impl Border {
             outer_rect: GameObject::new(
                 renderer,
                 storage,
+                Quad::new(width, height),
                 width,
                 height,
                 border_color,
@@ -39,6 +41,7 @@ impl Border {
             inner_rect: GameObject::new(
                 renderer,
                 storage,
+                Quad::new(width - thickness, height - thickness),
                 width - thickness,
                 height - thickness,
                 inner_color,
