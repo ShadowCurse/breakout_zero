@@ -235,62 +235,13 @@ impl Game {
 
         let camera = GameCamera::new(&renderer, &mut storage, [0.0, 0.0, 5.0]);
 
-        // let ball = GameObject::new(
-        //     &renderer,
-        //     &mut storage,
-        //     1.0,
-        //     1.0,
-        //     [0.4, 0.9, 0.4, 1.0],
-        //     [0.0, 0.0, 0.0],
-        // );
-        // let platform = GameObject::new(
-        //     &renderer,
-        //     &mut storage,
-        //     2.0,
-        //     0.5,
-        //     [0.6, 0.6, 0.6, 1.0],
-        //     [0.0, -1.0, 0.0],
-        // );
-        //
-        // let center = Vector3::new(0.0, 3.0, 0.0);
-        // let rows: u32 = 3;
-        // let cols: u32 = 4;
-        // let width: f32 = 1.5;
-        // let height: f32 = 0.8;
-        // let gap_x: f32 = 0.2;
-        // let gap_y: f32 = 0.2;
-        // let bottom_left = center
-        //     - Vector3::new(
-        //         (gap_x + width) / 2.0 * (cols - 1) as f32,
-        //         (gap_y + height) / 2.0 * (rows - 1) as f32,
-        //         0.0,
-        //     );
-        // let mut crates = vec![];
-        // for x in 0..cols {
-        //     for y in 0..rows {
-        //         let c = GameObject::new(
-        //             &renderer,
-        //             &mut storage,
-        //             width,
-        //             height,
-        //             [0.8, 0.8, 0.8, 1.0],
-        //             [
-        //                 bottom_left.x + x as f32 * (width + gap_x),
-        //                 bottom_left.y + y as f32 * (height + gap_y),
-        //                 0.0,
-        //             ],
-        //         );
-        //         crates.push(c);
-        //     }
-        // }
-        //
         let border = Border::new(
             &renderer,
             &mut storage,
             15.0,
             20.0,
             0.2,
-            [0.6, 0.6, 0.6, 1.0],
+            [0.7, 0.7, 0.7, 1.0],
             [0.0, 0.0, 0.0, 0.0],
         );
 
@@ -304,7 +255,7 @@ impl Game {
             },
             2.0,
             0.5,
-            [0.6, 0.6, 0.6, 1.0],
+            [0.9, 0.16, 0.21, 1.0],
             5.0,
         );
 
@@ -318,7 +269,7 @@ impl Game {
             },
             1.0,
             1.0,
-            [0.4, 0.9, 0.4, 1.0],
+            [0.0, 0.9, 0.18, 1.0],
             Vector2 { x: 2.5, y: 2.5 },
             1.0,
         );
@@ -337,7 +288,7 @@ impl Game {
             1.0,
             0.2,
             0.2,
-            [0.4, 0.4, 0.4, 1.0],
+            [0.5, 0.5, 0.5, 1.0],
         );
 
         Self {
