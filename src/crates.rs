@@ -159,6 +159,8 @@ pub struct CratePack {
     pub crates_handle: CratesHandle,
     pub rect_width: f32,
     pub rect_height: f32,
+
+    pub need_sync: bool,
 }
 
 impl CratePack {
@@ -213,11 +215,15 @@ impl CratePack {
             crates_handle,
             rect_width: width,
             rect_height: height,
+            need_sync: false,
         }
     }
 
-    pub fn render_sync(&self, renderer: &Renderer, storage: &RenderStorage) {
-        self.crates_handle.update(renderer, storage, &self.crates)
+    pub fn render_sync(&mut self, renderer: &Renderer, storage: &RenderStorage) {
+        if self.need_sync {
+            self.crates_handle.update(renderer, storage, &self.crates);
+            self.need_sync = false;
+        }
     }
 
     #[inline]
@@ -249,6 +255,7 @@ impl Collider for CratePack {
                 let crate_rect = c.rect(self.rect_width, self.rect_height);
                 if let Some(collision) = crate_rect.collides(other) {
                     c.disabled = true;
+                    self.need_sync = true;
                     return Some(collision);
                 }
             }
