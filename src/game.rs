@@ -3,7 +3,11 @@ use winit::{dpi::PhysicalSize, event::ElementState, keyboard::Key, window::Windo
 use zero::{const_vec, impl_simple_buffer, prelude::*};
 
 use crate::{
-    ball::Ball, border::Border, crates::CratePack, physics::Rectangle, platform::Platform,
+    ball::Ball,
+    border::Border,
+    crates::{CrateInstanceVertex, CratePack, CratesBindGroup},
+    physics::Rectangle,
+    platform::Platform,
 };
 
 #[repr(C)]
@@ -153,6 +157,7 @@ pub struct Game {
     storage: RenderStorage,
 
     color_pipeline_id: ResourceId,
+    crates_pipeline_id: ResourceId,
     depth_texture_id: ResourceId,
 
     phase: RenderPhase,
@@ -173,6 +178,7 @@ impl Game {
         storage.register_bind_group_layout::<CameraBindGroup>(&renderer);
         storage.register_bind_group_layout::<ColorMaterialBindGroup>(&renderer);
         storage.register_bind_group_layout::<TransformBindGroup>(&renderer);
+        storage.register_bind_group_layout::<CratesBindGroup>(&renderer);
 
         let color_pipeline = PipelineBuilder {
             shader_path: "./shaders/color.wgsl",
@@ -215,6 +221,48 @@ impl Game {
         }
         .build(&renderer);
         let color_pipeline_id = storage.insert_pipeline(color_pipeline);
+
+        let crates_pipeline = PipelineBuilder {
+            shader_path: "./shaders/crates.wgsl",
+            label: Some("crates_pipeline"),
+            layout_descriptor: Some(&PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[
+                    storage.get_bind_group_layout::<ColorMaterialBindGroup>(),
+                    // storage.get_bind_group_layout::<CratesBindGroup>(),
+                    storage.get_bind_group_layout::<CameraBindGroup>(),
+                ],
+                push_constant_ranges: &[],
+            }),
+            vertex_layouts: &[MeshVertex::layout(), CrateInstanceVertex::layout()],
+            vertex_entry_point: "vs_main",
+            color_targets: Some(&[Some(ColorTargetState {
+                format: renderer.surface_format(),
+                blend: None,
+                write_mask: ColorWrites::ALL,
+            })]),
+            fragment_entry_point: "fs_main",
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: FrontFace::Ccw,
+                cull_mode: Some(Face::Back),
+                polygon_mode: PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::LessEqual,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
+            multisample: MultisampleState::default(),
+            multiview: None,
+        }
+        .build(&renderer);
+        let crates_pipeline_id = storage.insert_pipeline(crates_pipeline);
 
         let depth_texture_id = storage.insert_texture(EmptyTexture::new_depth().build(&renderer));
 
@@ -297,6 +345,7 @@ impl Game {
             renderer,
             storage,
             color_pipeline_id,
+            crates_pipeline_id,
             depth_texture_id,
             phase,
             camera,
@@ -328,6 +377,7 @@ impl Game {
     pub fn render_sync(&mut self) {
         self.platform.render_sync(&self.renderer, &self.storage);
         self.ball.render_sync(&self.renderer, &self.storage);
+        self.crate_pack.render_sync(&self.renderer, &self.storage);
     }
 
     pub fn render(&mut self) -> bool {
@@ -362,18 +412,18 @@ impl Game {
         let platform_command = self
             .platform
             .render_command(self.color_pipeline_id, self.camera.bind_group.0);
-        let crates_commands = self
+        let crates_command = self
             .crate_pack
-            .render_commands(self.color_pipeline_id, self.camera.bind_group.0);
+            .render_commands(self.crates_pipeline_id, self.camera.bind_group.0);
         {
             let mut render_pass = self.phase.render_pass(&mut encoder, &current_frame_storage);
             for command in border_commands
                 .iter()
                 .chain([ball_command, platform_command].iter())
-                .chain(crates_commands.iter())
             {
                 command.execute(&mut render_pass, &current_frame_storage);
             }
+            crates_command.execute(&mut render_pass, &current_frame_storage);
         }
 
         let commands = encoder.finish();
