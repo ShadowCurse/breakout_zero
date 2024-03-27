@@ -1,5 +1,10 @@
-use winit::{dpi::PhysicalSize, event::ElementState, keyboard::Key, window::Window};
-use zero::{const_vec, prelude::*};
+use zero::{
+    const_vec,
+    prelude::{
+        winit::{dpi::PhysicalSize, event::ElementState, keyboard::Key, window::Window},
+        *,
+    },
+};
 
 use crate::{
     ball::Ball,
@@ -37,8 +42,8 @@ impl GameCamera {
         }
     }
 }
-pub struct Game {
-    renderer: Renderer,
+pub struct Game<'window> {
+    renderer: Renderer<'window>,
     storage: RenderStorage,
 
     instance_pipeline_id: ResourceId,
@@ -54,8 +59,8 @@ pub struct Game {
     crate_pack: CratePack,
 }
 
-impl Game {
-    pub fn new(window: &Window) -> Self {
+impl<'window> Game<'window> {
+    pub fn new(window: &'window Window) -> Game<'window> {
         let renderer = pollster::block_on(Renderer::new(window));
         let mut storage = RenderStorage::default();
 
