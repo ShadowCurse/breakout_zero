@@ -227,11 +227,7 @@ impl Game {
             label: Some("crates_pipeline"),
             layout_descriptor: Some(&PipelineLayoutDescriptor {
                 label: None,
-                bind_group_layouts: &[
-                    storage.get_bind_group_layout::<ColorMaterialBindGroup>(),
-                    // storage.get_bind_group_layout::<CratesBindGroup>(),
-                    storage.get_bind_group_layout::<CameraBindGroup>(),
-                ],
+                bind_group_layouts: &[storage.get_bind_group_layout::<CameraBindGroup>()],
                 push_constant_ranges: &[],
             }),
             vertex_layouts: &[MeshVertex::layout(), CrateInstanceVertex::layout()],

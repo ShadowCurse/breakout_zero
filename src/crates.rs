@@ -4,17 +4,19 @@ use crate::physics::{Collider, Collision, Rectangle};
 
 pub struct Crate {
     transform: Transform,
+    color: [f32; 4],
     disabled: bool,
 }
 
 impl Crate {
-    pub fn new(position: Vector3<f32>) -> Self {
+    pub fn new(position: Vector3<f32>, color: [f32; 4]) -> Self {
         Self {
-            disabled: false,
             transform: Transform {
                 translation: position,
                 ..Default::default()
             },
+            color,
+            disabled: false,
         }
     }
 
@@ -32,6 +34,7 @@ impl Crate {
 #[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CrateUniform {
     transform: [[f32; 4]; 4],
+    color: [f32; 4],
     disabled: u32,
 }
 
@@ -39,6 +42,7 @@ impl From<&Crate> for CrateUniform {
     fn from(value: &Crate) -> Self {
         CrateUniform {
             transform: Matrix4::<f32>::from(&value.transform).into(),
+            color: value.color,
             disabled: value.disabled.into(),
         }
     }
@@ -83,6 +87,7 @@ pub struct CrateInstanceVertex {
     pub transform_1: [f32; 4],
     pub transform_2: [f32; 4],
     pub transform_3: [f32; 4],
+    pub color: [f32; 4],
     pub disabled: i32,
 }
 
@@ -115,6 +120,11 @@ impl VertexLayout for CrateInstanceVertex {
                 VertexAttribute {
                     offset: std::mem::size_of::<[f32; 16]>() as BufferAddress,
                     shader_location: 9,
+                    format: VertexFormat::Float32x4,
+                },
+                VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 20]>() as BufferAddress,
+                    shader_location: 10,
                     format: VertexFormat::Sint32,
                 },
             ],
@@ -126,7 +136,7 @@ pub struct CratesRenderCommand {
     pub pipeline_id: ResourceId,
     pub mesh_id: ResourceId,
     pub instance_buffer_id: ResourceId,
-    pub bind_groups: [ResourceId; 2],
+    pub bind_groups: [ResourceId; 1],
     pub num: u32,
 }
 
@@ -150,10 +160,6 @@ impl RenderCommand for CratesRenderCommand {
 
 pub struct CratePack {
     pub mesh_id: ResourceId,
-
-    pub material: crate::ColorMaterial,
-    pub material_handle: crate::ColorMaterialHandle,
-    pub material_bind_group: crate::ColorMaterialBindGroup,
 
     pub crates: Crates,
     pub crates_handle: CratesHandle,
@@ -186,11 +192,14 @@ impl CratePack {
         let mut crates = vec![];
         for x in 0..cols {
             for y in 0..rows {
-                let c = Crate::new(Vector3::new(
-                    bottom_left.x + x as f32 * (width + gap_x),
-                    bottom_left.y + y as f32 * (height + gap_y),
-                    0.0,
-                ));
+                let c = Crate::new(
+                    Vector3::new(
+                        bottom_left.x + x as f32 * (width + gap_x),
+                        bottom_left.y + y as f32 * (height + gap_y),
+                        0.0,
+                    ),
+                    color,
+                );
                 crates.push(c);
             }
         }
@@ -199,18 +208,10 @@ impl CratePack {
         let mesh: Mesh = Quad::new(width, height).into();
         let mesh_id = storage.insert_mesh(mesh.build(renderer));
 
-        let material = crate::ColorMaterial { color };
-        let material_handle = crate::ColorMaterialHandle::new(storage, material.build(renderer));
-        let material_bind_group =
-            crate::ColorMaterialBindGroup::new(renderer, storage, &material_handle);
-
         let crates_handle = CratesHandle::new(storage, crates.build(renderer));
 
         Self {
             mesh_id,
-            material,
-            material_handle,
-            material_bind_group,
             crates,
             crates_handle,
             rect_width: width,
@@ -236,7 +237,7 @@ impl CratePack {
             pipeline_id,
             mesh_id: self.mesh_id,
             instance_buffer_id: self.crates_handle.buffer_id,
-            bind_groups: [self.material_bind_group.0, camera_bind_group],
+            bind_groups: [camera_bind_group],
             num: self.crates.crates.len() as u32,
         }
     }
