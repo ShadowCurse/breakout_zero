@@ -1,71 +1,87 @@
 use zero::{
-    cgmath_imports::{Vector2, Vector3},
-    mesh::MeshRenderCommand,
-    render::{
-        renderer::Renderer,
-        storage::{RenderStorage, ResourceId},
-    },
-    shapes::Quad,
+    cgmath_imports::{Matrix4, Vector2, Vector3},
+    render::{renderer::Renderer, storage::RenderStorage},
+    transform::Transform,
 };
 
 use crate::{
     physics::{Collider, Collision, Rectangle},
-    GameObject,
+    InstanceUniform, Instances,
 };
 
 pub struct Border {
-    outer_rect: GameObject,
-    inner_rect: GameObject,
+    width: f32,
+    height: f32,
+    thickness: f32,
+    border_color: [f32; 4],
+    inner_color: [f32; 4],
+    instance_buffer_offset: u64,
 }
 
 impl Border {
     pub fn new(
-        renderer: &Renderer,
-        storage: &mut RenderStorage,
         width: f32,
         height: f32,
         thickness: f32,
         border_color: [f32; 4],
         inner_color: [f32; 4],
+        instance_buffer_offset: u64,
     ) -> Self {
         Self {
-            outer_rect: GameObject::new(
-                renderer,
-                storage,
-                Quad::new(width, height),
-                width,
-                height,
-                border_color,
-                Vector3::new(0.0, 0.0, -0.1),
-            ),
-            inner_rect: GameObject::new(
-                renderer,
-                storage,
-                Quad::new(width - thickness, height - thickness),
-                width - thickness,
-                height - thickness,
-                inner_color,
-                Vector3::new(0.0, 0.0, -0.01),
-            ),
+            width,
+            height,
+            thickness,
+            border_color,
+            inner_color,
+            instance_buffer_offset,
         }
     }
 
-    pub fn render_commands(
-        &self,
-        pipeline_id: ResourceId,
-        camera_bind_group: ResourceId,
-    ) -> [MeshRenderCommand; 2] {
-        [
-            self.outer_rect.command(pipeline_id, camera_bind_group),
-            self.inner_rect.command(pipeline_id, camera_bind_group),
-        ]
+    #[inline]
+    pub fn border(&self) -> Rectangle {
+        Rectangle::from_center(Vector2::new(0.0, 0.0), self.width, self.height)
+    }
+
+    pub fn render_sync(&self, renderer: &Renderer, storage: &RenderStorage, boxes: &Instances) {
+        let data = [
+            InstanceUniform {
+                transform: Matrix4::from(&Transform {
+                    translation: Vector3::new(0.0, 0.0, -0.1),
+                    scale: Vector3::new(self.width, self.height, 1.0),
+                    ..Default::default()
+                })
+                .into(),
+                color: self.border_color,
+                disabled: 0,
+            },
+            InstanceUniform {
+                transform: Matrix4::from(&Transform {
+                    translation: Vector3::new(0.0, 0.0, -0.01),
+                    scale: Vector3::new(
+                        self.width - self.thickness,
+                        self.height - self.thickness,
+                        1.0,
+                    ),
+                    ..Default::default()
+                })
+                .into(),
+                color: self.inner_color,
+                disabled: 0,
+            },
+        ];
+        boxes.box_instance_buffer_handle.update(
+            renderer,
+            storage,
+            self.instance_buffer_offset,
+            &data,
+        );
     }
 }
 
 impl Collider for Border {
     #[inline]
     fn rect(&self) -> Option<Rectangle> {
-        Some(self.inner_rect.rect())
+        Some(self.border())
     }
 
     fn collides(&self, other: &impl Collider) -> Option<Collision> {

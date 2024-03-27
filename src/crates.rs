@@ -1,6 +1,9 @@
-use zero::{impl_simple_buffer, prelude::wgpu::*, prelude::*};
+use zero::prelude::*;
 
-use crate::physics::{Collider, Collision, Rectangle};
+use crate::{
+    physics::{Collider, Collision, Rectangle},
+    InstanceUniform, Instances,
+};
 
 pub struct Crate {
     transform: Transform,
@@ -9,10 +12,11 @@ pub struct Crate {
 }
 
 impl Crate {
-    pub fn new(position: Vector3<f32>, color: [f32; 4]) -> Self {
+    pub fn new(translation: Vector3<f32>, scale: Vector3<f32>, color: [f32; 4]) -> Self {
         Self {
             transform: Transform {
-                translation: position,
+                translation,
+                scale,
                 ..Default::default()
             },
             color,
@@ -30,150 +34,18 @@ impl Crate {
     }
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CrateUniform {
-    transform: [[f32; 4]; 4],
-    color: [f32; 4],
-    disabled: u32,
-}
-
-impl From<&Crate> for CrateUniform {
-    fn from(value: &Crate) -> Self {
-        CrateUniform {
-            transform: Matrix4::<f32>::from(&value.transform).into(),
-            color: value.color,
-            disabled: value.disabled.into(),
-        }
-    }
-}
-
-const MAX_CRATES: usize = 64;
-pub struct Crates {
-    crates: Vec<Crate>,
-}
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CratesUniform {
-    crates: [CrateUniform; MAX_CRATES],
-}
-
-impl From<&Crates> for CratesUniform {
-    fn from(value: &Crates) -> Self {
-        let mut crates = [CrateUniform::default(); MAX_CRATES];
-        for (i, c) in value.crates.iter().enumerate() {
-            crates[i] = c.into();
-        }
-        Self { crates }
-    }
-}
-
-impl_simple_buffer!(
-    Crates,
-    CratesUniform,
-    CratesResources,
-    CratesHandle,
-    CratesBindGroup,
-    { BufferUsages::VERTEX | BufferUsages::COPY_DST },
-    { ShaderStages::VERTEX | ShaderStages::FRAGMENT },
-    { BufferBindingType::Storage { read_only: true } }
-);
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CrateInstanceVertex {
-    pub transform_0: [f32; 4],
-    pub transform_1: [f32; 4],
-    pub transform_2: [f32; 4],
-    pub transform_3: [f32; 4],
-    pub color: [f32; 4],
-    pub disabled: i32,
-}
-
-impl VertexLayout for CrateInstanceVertex {
-    fn layout<'a>() -> VertexBufferLayout<'a> {
-        VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as BufferAddress,
-            step_mode: VertexStepMode::Instance,
-            attributes: &[
-                VertexAttribute {
-                    offset: 0,
-                    shader_location: 5,
-                    format: VertexFormat::Float32x4,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 4]>() as BufferAddress,
-                    shader_location: 6,
-                    format: VertexFormat::Float32x4,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 8]>() as BufferAddress,
-                    shader_location: 7,
-                    format: VertexFormat::Float32x4,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 12]>() as BufferAddress,
-                    shader_location: 8,
-                    format: VertexFormat::Float32x4,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 16]>() as BufferAddress,
-                    shader_location: 9,
-                    format: VertexFormat::Float32x4,
-                },
-                VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 20]>() as BufferAddress,
-                    shader_location: 10,
-                    format: VertexFormat::Sint32,
-                },
-            ],
-        }
-    }
-}
-
-pub struct CratesRenderCommand {
-    pub pipeline_id: ResourceId,
-    pub mesh_id: ResourceId,
-    pub instance_buffer_id: ResourceId,
-    pub bind_groups: [ResourceId; 1],
-    pub num: u32,
-}
-
-impl RenderCommand for CratesRenderCommand {
-    fn execute<'a>(&self, render_pass: &mut RenderPass<'a>, storage: &'a CurrentFrameStorage) {
-        render_pass.set_pipeline(storage.get_pipeline(self.pipeline_id));
-        for (i, bg) in self.bind_groups.iter().enumerate() {
-            render_pass.set_bind_group(i as u32, storage.get_bind_group(*bg), &[]);
-        }
-
-        let mesh = storage.get_mesh(self.mesh_id);
-        render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-        let instance_buffer = storage.get_buffer(self.instance_buffer_id);
-        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-
-        let index_buffer = mesh.index_buffer.as_ref().unwrap();
-        render_pass.set_index_buffer(index_buffer.slice(..), IndexFormat::Uint32);
-        render_pass.draw_indexed(0..mesh.num_elements, 0, 0..self.num);
-    }
-}
-
 pub struct CratePack {
-    pub mesh_id: ResourceId,
-
-    pub crates: Crates,
-    pub crates_handle: CratesHandle,
+    pub crates: Vec<Crate>,
     pub rect_width: f32,
     pub rect_height: f32,
-
     pub need_sync: bool,
+
+    pub instance_buffer_offset: u64,
 }
 
 impl CratePack {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        renderer: &Renderer,
-        storage: &mut RenderStorage,
         center: Vector3<f32>,
         rows: u32,
         cols: u32,
@@ -182,6 +54,7 @@ impl CratePack {
         gap_x: f32,
         gap_y: f32,
         color: [f32; 4],
+        instance_buffer_offset: u64,
     ) -> Self {
         let bottom_left = center
             - Vector3::new(
@@ -198,47 +71,40 @@ impl CratePack {
                         bottom_left.y + y as f32 * (height + gap_y),
                         0.0,
                     ),
+                    Vector3::new(width, height, 1.0),
                     color,
                 );
                 crates.push(c);
             }
         }
-        let crates = Crates { crates };
-
-        let mesh: Mesh = Quad::new(width, height).into();
-        let mesh_id = storage.insert_mesh(mesh.build(renderer));
-
-        let crates_handle = CratesHandle::new(storage, crates.build(renderer));
 
         Self {
-            mesh_id,
             crates,
-            crates_handle,
             rect_width: width,
             rect_height: height,
-            need_sync: false,
+            need_sync: true,
+            instance_buffer_offset,
         }
     }
 
-    pub fn render_sync(&mut self, renderer: &Renderer, storage: &RenderStorage) {
+    pub fn render_sync(&mut self, renderer: &Renderer, storage: &RenderStorage, boxes: &Instances) {
         if self.need_sync {
-            self.crates_handle.update(renderer, storage, &self.crates);
+            let data = self
+                .crates
+                .iter()
+                .map(|c| InstanceUniform {
+                    transform: Matrix4::from(&c.transform).into(),
+                    color: c.color,
+                    disabled: c.disabled.into(),
+                })
+                .collect::<Vec<_>>();
+            boxes.box_instance_buffer_handle.update(
+                renderer,
+                storage,
+                self.instance_buffer_offset,
+                &data,
+            );
             self.need_sync = false;
-        }
-    }
-
-    #[inline]
-    pub fn render_commands(
-        &self,
-        pipeline_id: ResourceId,
-        camera_bind_group: ResourceId,
-    ) -> CratesRenderCommand {
-        CratesRenderCommand {
-            pipeline_id,
-            mesh_id: self.mesh_id,
-            instance_buffer_id: self.crates_handle.buffer_id,
-            bind_groups: [camera_bind_group],
-            num: self.crates.crates.len() as u32,
         }
     }
 }
@@ -251,7 +117,7 @@ impl Collider for CratePack {
 
     #[inline]
     fn collides_mut(&mut self, other: &impl Collider) -> Option<Collision> {
-        for c in self.crates.crates.iter_mut() {
+        for c in self.crates.iter_mut() {
             if !c.disabled {
                 let crate_rect = c.rect(self.rect_width, self.rect_height);
                 if let Some(collision) = crate_rect.collides(other) {
