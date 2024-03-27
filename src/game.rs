@@ -310,8 +310,6 @@ pub struct Game {
 
     color_pipeline_id: ResourceId,
     instance_pipeline_id: ResourceId,
-    depth_texture_id: ResourceId,
-
     phase: RenderPhase,
 
     camera: GameCamera,
@@ -362,13 +360,7 @@ impl Game {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::LessEqual,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
+            depth_stencil: None,
             multisample: MultisampleState::default(),
             multiview: None,
         }
@@ -400,20 +392,12 @@ impl Game {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::LessEqual,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
+            depth_stencil: None,
             multisample: MultisampleState::default(),
             multiview: None,
         }
         .build(&renderer);
         let instance_pipeline_id = storage.insert_pipeline(instance_pipeline);
-
-        let depth_texture_id = storage.insert_texture(EmptyTexture::new_depth().build(&renderer));
 
         let phase = RenderPhase::new(
             const_vec![ColorAttachment {
@@ -423,14 +407,7 @@ impl Game {
                     store: StoreOp::Store,
                 },
             },],
-            Some(DepthStencil {
-                view_id: depth_texture_id,
-                depth_ops: Some(Operations {
-                    load: LoadOp::Clear(1.0),
-                    store: StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
+            None,
         );
 
         let camera = GameCamera::new(&renderer, &mut storage, [0.0, 0.0, 5.0]);
@@ -497,7 +474,6 @@ impl Game {
             storage,
             color_pipeline_id,
             instance_pipeline_id,
-            depth_texture_id,
             box_instances: boxes,
             phase,
             camera,
@@ -514,10 +490,6 @@ impl Game {
 
     pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
         self.renderer.resize(Some(physical_size));
-        self.storage.replace_texture(
-            self.depth_texture_id,
-            EmptyTexture::new_depth().build(&self.renderer),
-        );
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -565,8 +537,8 @@ impl Game {
             .render_command(self.instance_pipeline_id, self.camera.bind_group.0);
         {
             let mut render_pass = self.phase.render_pass(&mut encoder, &current_frame_storage);
-            ball_command.execute(&mut render_pass, &current_frame_storage);
             boxes_command.execute(&mut render_pass, &current_frame_storage);
+            ball_command.execute(&mut render_pass, &current_frame_storage);
         }
 
         let commands = encoder.finish();
