@@ -10,6 +10,7 @@ mod crates;
 mod game;
 mod physics;
 mod platform;
+mod rendering;
 
 use game::*;
 

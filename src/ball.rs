@@ -13,7 +13,7 @@ use crate::{
     crates::CratePack,
     physics::{Collider, Collision, Rectangle},
     platform::Platform,
-    InstanceUniform, Instances, InstancesRenderCommand,
+    rendering::{InstanceUniform, Instances, InstancesRenderCommand},
 };
 
 pub struct Ball {

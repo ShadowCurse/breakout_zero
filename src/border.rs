@@ -6,7 +6,7 @@ use zero::{
 
 use crate::{
     physics::{Collider, Collision, Rectangle},
-    InstanceUniform, Instances,
+    rendering::{InstanceUniform, Instances},
 };
 
 pub struct Border {
@@ -69,12 +69,9 @@ impl Border {
                 disabled: 0,
             },
         ];
-        boxes.instance_buffer_handle.update(
-            renderer,
-            storage,
-            self.instance_buffer_offset,
-            &data,
-        );
+        boxes
+            .instance_buffer_handle
+            .update(renderer, storage, self.instance_buffer_offset, &data);
     }
 }
 

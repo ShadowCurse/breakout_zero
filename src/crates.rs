@@ -2,7 +2,7 @@ use zero::prelude::*;
 
 use crate::{
     physics::{Collider, Collision, Rectangle},
-    InstanceUniform, Instances,
+    rendering::{InstanceUniform, Instances},
 };
 
 pub struct Crate {

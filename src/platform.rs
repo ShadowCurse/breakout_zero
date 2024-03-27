@@ -8,7 +8,7 @@ use zero::{
 use crate::{
     border::Border,
     physics::{Collider, Collision, Rectangle},
-    InstanceUniform, Instances,
+    rendering::{InstanceUniform, Instances},
 };
 
 pub struct Platform {
