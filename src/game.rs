@@ -1,37 +1,7 @@
 use winit::{dpi::PhysicalSize, event::ElementState, keyboard::Key, window::Window};
-use zero::{const_vec, impl_simple_buffer, impl_simple_sized_gpu_buffer, prelude::*};
+use zero::{const_vec, impl_simple_sized_gpu_buffer, prelude::*};
 
-use crate::{
-    ball::Ball, border::Border, crates::CratePack, physics::Rectangle, platform::Platform,
-};
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ColorMaterialUniform {
-    color: [f32; 4],
-}
-
-impl From<&ColorMaterial> for ColorMaterialUniform {
-    fn from(value: &ColorMaterial) -> Self {
-        Self { color: value.color }
-    }
-}
-
-#[derive(Debug)]
-pub struct ColorMaterial {
-    pub color: [f32; 4],
-}
-
-impl_simple_buffer!(
-    ColorMaterial,
-    ColorMaterialUniform,
-    ColorMaterialResources,
-    ColorMaterialHandle,
-    ColorMaterialBindGroup,
-    { BufferUsages::UNIFORM | BufferUsages::COPY_DST },
-    { ShaderStages::FRAGMENT },
-    { BufferBindingType::Uniform }
-);
+use crate::{ball::Ball, border::Border, crates::CratePack, platform::Platform};
 
 pub struct GameCamera {
     camera: Camera,
@@ -59,91 +29,6 @@ impl GameCamera {
             handle,
             bind_group,
         }
-    }
-}
-
-pub struct GameObject {
-    pub mesh_id: ResourceId,
-
-    pub material: ColorMaterial,
-    pub material_handle: ColorMaterialHandle,
-    pub material_bind_group: ColorMaterialBindGroup,
-
-    pub transform: Transform,
-    pub transform_handle: TransformHandle,
-    pub transform_bind_group: TransformBindGroup,
-
-    pub rect_width: f32,
-    pub rect_height: f32,
-}
-
-impl GameObject {
-    pub fn new<M: Into<Mesh>>(
-        renderer: &Renderer,
-        storage: &mut RenderStorage,
-        mesh: M,
-        rect_width: f32,
-        rect_height: f32,
-        color: [f32; 4],
-        position: Vector3<f32>,
-    ) -> Self {
-        let mesh: Mesh = mesh.into();
-        let mesh_id = storage.insert_mesh(mesh.build(renderer));
-
-        let material = ColorMaterial { color };
-        let material_handle = ColorMaterialHandle::new(storage, material.build(renderer));
-        let material_bind_group = ColorMaterialBindGroup::new(renderer, storage, &material_handle);
-
-        let transform = Transform {
-            translation: position,
-            ..Default::default()
-        };
-        let transform_handle = TransformHandle::new(storage, transform.build(renderer));
-        let transform_bind_group = TransformBindGroup::new(renderer, storage, &transform_handle);
-
-        Self {
-            mesh_id,
-            material,
-            material_handle,
-            material_bind_group,
-            transform,
-            transform_handle,
-            transform_bind_group,
-            rect_width,
-            rect_height,
-        }
-    }
-
-    pub fn command(
-        &self,
-        pipeline_id: ResourceId,
-        camera_bind_group: ResourceId,
-    ) -> MeshRenderCommand {
-        MeshRenderCommand {
-            pipeline_id,
-            mesh_id: self.mesh_id,
-            index_slice: None,
-            vertex_slice: None,
-            scissor_rect: None,
-            bind_groups: const_vec![
-                self.material_bind_group.0,
-                self.transform_bind_group.0,
-                camera_bind_group,
-            ],
-        }
-    }
-
-    pub fn rect(&self) -> Rectangle {
-        Rectangle::from_center(
-            self.transform.translation.truncate(),
-            self.rect_width,
-            self.rect_height,
-        )
-    }
-
-    pub fn update_transform(&self, renderer: &Renderer, storage: &RenderStorage) {
-        self.transform_handle
-            .update(renderer, storage, &self.transform);
     }
 }
 
@@ -239,7 +124,7 @@ impl InstanceBufferHandle {
 
 pub struct Instances {
     pub mesh_id: ResourceId,
-    pub box_instance_buffer_handle: InstanceBufferHandle,
+    pub instance_buffer_handle: InstanceBufferHandle,
     pub instance_num: u32,
 }
 
@@ -260,7 +145,7 @@ impl Instances {
         let instance_buffer_handle = InstanceBufferHandle::new(storage, instance_buffer_resource);
         Self {
             mesh_id,
-            box_instance_buffer_handle: instance_buffer_handle,
+            instance_buffer_handle,
             instance_num: num,
         }
     }
@@ -273,7 +158,7 @@ impl Instances {
         InstancesRenderCommand {
             pipeline_id,
             mesh_id: self.mesh_id,
-            instance_buffer_id: self.box_instance_buffer_handle.buffer_id,
+            instance_buffer_id: self.instance_buffer_handle.buffer_id,
             camera_bind_group,
             instance_num: self.instance_num,
         }
@@ -308,7 +193,6 @@ pub struct Game {
     renderer: Renderer,
     storage: RenderStorage,
 
-    color_pipeline_id: ResourceId,
     instance_pipeline_id: ResourceId,
     phase: RenderPhase,
 
@@ -328,45 +212,6 @@ impl Game {
         let mut storage = RenderStorage::default();
 
         storage.register_bind_group_layout::<CameraBindGroup>(&renderer);
-        storage.register_bind_group_layout::<ColorMaterialBindGroup>(&renderer);
-        storage.register_bind_group_layout::<TransformBindGroup>(&renderer);
-
-        let color_pipeline = PipelineBuilder {
-            shader_path: "./shaders/color.wgsl",
-            label: Some("color_pipeline"),
-            layout_descriptor: Some(&PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[
-                    storage.get_bind_group_layout::<ColorMaterialBindGroup>(),
-                    storage.get_bind_group_layout::<TransformBindGroup>(),
-                    storage.get_bind_group_layout::<CameraBindGroup>(),
-                ],
-                push_constant_ranges: &[],
-            }),
-            vertex_layouts: &[MeshVertex::layout()],
-            vertex_entry_point: "vs_main",
-            color_targets: Some(&[Some(ColorTargetState {
-                format: renderer.surface_format(),
-                blend: None,
-                write_mask: ColorWrites::ALL,
-            })]),
-            fragment_entry_point: "fs_main",
-            primitive: PrimitiveState {
-                topology: PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
-                polygon_mode: PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: MultisampleState::default(),
-            multiview: None,
-        }
-        .build(&renderer);
-        let color_pipeline_id = storage.insert_pipeline(color_pipeline);
-
         let instance_pipeline = PipelineBuilder {
             shader_path: "./shaders/instance.wgsl",
             label: Some("instance_pipeline"),
@@ -412,6 +257,9 @@ impl Game {
 
         let camera = GameCamera::new(&renderer, &mut storage, [0.0, 0.0, 5.0]);
 
+        // 2 instances for border
+        // 1 instance for platform
+        // 5 * 7 instances for crates
         let boxes = Instances::new(&renderer, &mut storage, Quad::new(1.0, 1.0), 2 + 1 + 5 * 7);
 
         let border = Border::new(
@@ -472,7 +320,6 @@ impl Game {
         Self {
             renderer,
             storage,
-            color_pipeline_id,
             instance_pipeline_id,
             box_instances: boxes,
             phase,
@@ -531,7 +378,7 @@ impl Game {
 
         let ball_command = self
             .ball
-            .render_command(self.color_pipeline_id, self.camera.bind_group.0);
+            .render_command(self.instance_pipeline_id, self.camera.bind_group.0);
         let boxes_command = self
             .box_instances
             .render_command(self.instance_pipeline_id, self.camera.bind_group.0);

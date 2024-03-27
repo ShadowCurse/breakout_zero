@@ -1,11 +1,11 @@
 use zero::{
-    cgmath_imports::{Vector2, Vector3},
-    mesh::MeshRenderCommand,
+    cgmath_imports::{Matrix4, Vector2, Vector3},
     render::{
         renderer::Renderer,
         storage::{RenderStorage, ResourceId},
     },
     shapes::Circle,
+    transform::Transform,
 };
 
 use crate::{
@@ -13,11 +13,16 @@ use crate::{
     crates::CratePack,
     physics::{Collider, Collision, Rectangle},
     platform::Platform,
-    GameObject,
+    InstanceUniform, Instances, InstancesRenderCommand,
 };
 
 pub struct Ball {
-    game_object: GameObject,
+    // game_object: GameObject,
+    instance: Instances,
+
+    transform: Transform,
+    radius: f32,
+    color: [f32; 4],
     velocity: Vector2<f32>,
     speed: f32,
 }
@@ -26,25 +31,35 @@ impl Ball {
     pub fn new(
         renderer: &Renderer,
         storage: &mut RenderStorage,
-        position: Vector3<f32>,
+        translation: Vector3<f32>,
         radius: f32,
         color: [f32; 4],
         velocity: Vector2<f32>,
         speed: f32,
     ) -> Self {
+        let mesh = Circle::new(radius, 50);
+        let instance = Instances::new(renderer, storage, mesh, 1);
+        let transform = Transform {
+            translation,
+            ..Default::default()
+        };
         Self {
-            game_object: GameObject::new(
-                renderer,
-                storage,
-                Circle::new(radius, 50),
-                radius * 2.0,
-                radius * 2.0,
-                color,
-                position,
-            ),
+            instance,
+            transform,
+            radius,
+            color,
             velocity,
             speed,
         }
+    }
+
+    #[inline]
+    pub fn border(&self) -> Rectangle {
+        Rectangle::from_center(
+            self.transform.translation.truncate(),
+            self.radius * 2.0,
+            self.radius * 2.0,
+        )
     }
 
     pub fn update(
@@ -54,8 +69,8 @@ impl Ball {
         crate_pack: &mut CratePack,
         dt: f32,
     ) {
-        self.game_object.transform.translation.x += self.velocity.x * self.speed * dt;
-        self.game_object.transform.translation.y += self.velocity.y * self.speed * dt;
+        self.transform.translation.x += self.velocity.x * self.speed * dt;
+        self.transform.translation.y += self.velocity.y * self.speed * dt;
 
         self.check_collision(border);
         self.check_collision(platform);
@@ -82,21 +97,28 @@ impl Ball {
     }
 
     pub fn render_sync(&self, renderer: &Renderer, storage: &RenderStorage) {
-        self.game_object.update_transform(renderer, storage);
+        let data = InstanceUniform {
+            transform: Matrix4::from(&self.transform).into(),
+            color: self.color,
+            disabled: 0,
+        };
+        self.instance
+            .instance_buffer_handle
+            .update(renderer, storage, 0, &[data]);
     }
 
     pub fn render_command(
         &self,
         pipeline_id: ResourceId,
         camera_bind_group: ResourceId,
-    ) -> MeshRenderCommand {
-        self.game_object.command(pipeline_id, camera_bind_group)
+    ) -> InstancesRenderCommand {
+        self.instance.render_command(pipeline_id, camera_bind_group)
     }
 }
 
 impl Collider for Ball {
     #[inline]
     fn rect(&self) -> Option<Rectangle> {
-        Some(self.game_object.rect())
+        Some(self.border())
     }
 }

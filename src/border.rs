@@ -69,7 +69,7 @@ impl Border {
                 disabled: 0,
             },
         ];
-        boxes.box_instance_buffer_handle.update(
+        boxes.instance_buffer_handle.update(
             renderer,
             storage,
             self.instance_buffer_offset,

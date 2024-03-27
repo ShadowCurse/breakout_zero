@@ -98,7 +98,7 @@ impl CratePack {
                     disabled: c.disabled.into(),
                 })
                 .collect::<Vec<_>>();
-            boxes.box_instance_buffer_handle.update(
+            boxes.instance_buffer_handle.update(
                 renderer,
                 storage,
                 self.instance_buffer_offset,
