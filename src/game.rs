@@ -375,9 +375,9 @@ impl Game {
         .build(&renderer);
         let color_pipeline_id = storage.insert_pipeline(color_pipeline);
 
-        let crates_pipeline = PipelineBuilder {
-            shader_path: "./shaders/crates.wgsl",
-            label: Some("crates_pipeline"),
+        let instance_pipeline = PipelineBuilder {
+            shader_path: "./shaders/instance.wgsl",
+            label: Some("instance_pipeline"),
             layout_descriptor: Some(&PipelineLayoutDescriptor {
                 label: None,
                 bind_group_layouts: &[storage.get_bind_group_layout::<CameraBindGroup>()],
@@ -411,7 +411,7 @@ impl Game {
             multiview: None,
         }
         .build(&renderer);
-        let crates_pipeline_id = storage.insert_pipeline(crates_pipeline);
+        let instance_pipeline_id = storage.insert_pipeline(instance_pipeline);
 
         let depth_texture_id = storage.insert_texture(EmptyTexture::new_depth().build(&renderer));
 
@@ -496,7 +496,7 @@ impl Game {
             renderer,
             storage,
             color_pipeline_id,
-            instance_pipeline_id: crates_pipeline_id,
+            instance_pipeline_id,
             depth_texture_id,
             box_instances: boxes,
             phase,
