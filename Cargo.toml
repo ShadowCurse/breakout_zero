@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 pollster = "0.2"
 env_logger = "0.10"
-zero = { git = "https://github.com/ShadowCurse/zero" }
+zero = { git = "https://github.com/ShadowCurse/zero", rev = "bea049a3752375e1f66fe559116d783f92b7b3e2" }
 bytemuck = { version = "1.14", features = [ "derive" ] }
